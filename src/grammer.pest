@@ -1,0 +1,28 @@
+Source = _{ SOI ~ Stat* ~ EOI }
+Stat   =  { Tag | Text }
+
+Value = { Idnt | Int }
+// TagStart =  { "{" }
+// TagEnd   =  { "}" }
+Text = @{ Char+ }
+Tag  =  {
+    "{" ~ Expression ~ "}"
+}
+
+ArgumentInitalizer = { "|" }
+ArgumentSeperator  = { ";" }
+
+Expression   = {
+    (PropertyCall | Idnt) ~ (ArgumentInitalizer ~ TagArguments)?
+}
+TagArguments = {
+    (PropertyCall | Value) ~ (ArgumentSeperator // ~ (PropertyCall | Value)
+  )?
+}
+Property     = { PropertyCall | Idnt }
+PropertyCall = { Idnt ~ "." ~ Property }
+
+Idnt       = @{ (ASCII_ALPHA | "_")+ }
+Char       =  { (!"{" ~ !"}" ~ ANY) }
+Int        =  { ASCII_DIGIT+ }
+WHITESPACE =  { " " | "\t" | "\r" | "\n" }
