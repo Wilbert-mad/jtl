@@ -12,7 +12,7 @@ Unlike many other templating langauges this one offers an LSP for your dashboard
 | Crate        | Description                                     | Progress |
 | ------------ | ----------------------------------------------- | -------- |
 | parser       | The core of the langauge                        | WIP 1    |
-| runtime      | Processes the execution of a template           | TODO 2   |
+| runtime      | Processes the execution of a template           | WIP 2    |
 | service      | Basic function for lsp                          | TODO 3   |
 | lsp          | An orginized and operational lsp (server ready) | TODO? 5  |
 | wasm_lsp     | An orginized and operational lsp (worker ready) | TODO 6   |
@@ -20,7 +20,7 @@ Unlike many other templating langauges this one offers an LSP for your dashboard
 
 <small>Numbers repersent the order in which I will be working though the project (help is appreciated)</small>
 
-# Schema defintions
+# Schema defintions (WIP)
 
 ```json
 {

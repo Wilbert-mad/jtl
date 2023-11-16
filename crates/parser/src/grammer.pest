@@ -1,3 +1,5 @@
+// Not the full grammer will update grammer some day...
+
 Source = _{ SOI ~ Stat* ~ EOI }
 Stat   =  { Tag | Text }
 
