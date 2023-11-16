@@ -13,11 +13,10 @@ ArgumentInitalizer = { "|" }
 ArgumentSeperator  = { ";" }
 
 Expression   = {
-    (PropertyCall | Idnt) ~ (ArgumentInitalizer ~ TagArguments)?
+    Property ~ (ArgumentInitalizer ~ TagArguments)?
 }
 TagArguments = {
-    (PropertyCall | Value) ~ (ArgumentSeperator // ~ (PropertyCall | Value)
-  )?
+    (PropertyCall | Value) ~ ArgumentSeperator? ~ (PropertyCall | Value)?
 }
 Property     = { PropertyCall | Idnt }
 PropertyCall = { Idnt ~ "." ~ Property }

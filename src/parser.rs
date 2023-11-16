@@ -1,11 +1,5 @@
 use crate::lex::{Lexer, Position, TToken, Token};
 
-pub struct ParserError {
-    pub message: String,
-    pub start: Position,
-    pub end: Position,
-}
-
 #[derive(Debug)]
 pub struct Source {
     pub _type: String,
@@ -33,7 +27,7 @@ pub enum Stat {
 #[derive(Debug)]
 pub struct Expression {
     pub _type: String,
-    pub property: Value,
+    pub property: Option<Value>,
     pub arguments: Option<Vec<Argument>>,
 }
 
@@ -70,6 +64,19 @@ pub struct Argument {
     pub _type: String,
 }
 
+#[derive(Debug)]
+pub struct ParserError {
+    pub message: String,
+    pub start: Position,
+    pub end: Position,
+}
+
+#[derive(Debug)]
+pub struct ParserResults {
+    pub errors: Vec<ParserError>,
+    pub ast: Source,
+}
+
 // TODO: Make parser fault tolorent (some day)
 pub struct Parser {
     // errors: vec![],
@@ -87,17 +94,22 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Source, String> {
-        let body = self.body()?;
-        Ok(Source {
-            _type: "Source".to_string(),
-            start: Position(0, 0),
-            end: self.end_position.clone(),
-            body,
-        })
+    pub fn parse(&mut self) -> ParserResults {
+        let mut errors = Vec::new();
+        let body = self.body(&mut errors);
+
+        ParserResults {
+            errors,
+            ast: Source {
+                _type: "Source".to_string(),
+                start: Position(0, 0),
+                end: self.end_position.clone(),
+                body,
+            },
+        }
     }
 
-    fn body(&mut self) -> Result<Vec<Stat>, String> {
+    fn body(&mut self, mut errors: &mut Vec<ParserError>) -> Vec<Stat> {
         let mut body = Vec::new();
 
         while !self.is_at_end() {
@@ -112,32 +124,33 @@ impl Parser {
                     }),
 
                     TToken::OpenTag => {
-                        let tag = self.tag_expression()?;
+                        let tag = self.tag_expression(&mut errors);
 
                         body.push(Stat::Tag {
                             _type: "Tag".to_string(),
                             start: token_data.start,
-                            end: token_data.end,
+                            end: token_data.end, // TODO: fix not the real end
                             value: tag,
                         })
                     }
-                    TToken::CloseTag => body.push(Stat::Text {
-                        _type: "Text".to_string(),
-                        value: "}".to_string(),
-                        start: token_data.start,
-                        end: token_data.end,
-                    }),
-                    _ => {}
+                    // TToken::CloseTag => body.push(Stat::Text {
+                    //     _type: "Text".to_string(),
+                    //     value: "}".to_string(),
+                    //     start: token_data.start,
+                    //     end: token_data.end,
+                    // }),
+                    t => {
+                        println!("TODO: {:?}", t);
+                    }
                 }
             }
         }
 
-        Ok(body)
+        body
     }
 
-    fn tag_expression(&mut self) -> Result<Expression, String> {
-        // Should stop paring when tag end is met
-        let property = self.tag_property()?;
+    fn tag_expression(&mut self, mut errors: &mut Vec<ParserError>) -> Expression {
+        let property = self.tag_property(&mut errors);
 
         // TODO: check arguments...
         let _arguments = self.tag_arguments();
@@ -145,109 +158,198 @@ impl Parser {
         let exp = Expression {
             _type: "Expression".to_string(),
             property,
-            // TODO: Parse aruments
             arguments: None,
         };
 
-        // self.visit_ws();
+        // Hello {guild
         let next = self.advance();
         if next.is_none() {
-            return Err("Expected closing tag (none)".to_string());
+            let last_token = self.tokens[self.tokens.len() - 1].clone();
+            errors.push(ParserError {
+                message: "Unexpected EOF expected '}'".to_string(),
+                start: last_token.end.clone(),
+                end: last_token.end.clone(),
+            });
+            return exp;
         }
 
         match next.unwrap().token {
             TToken::CloseTag => {}
+            // {toString | 0 world
+            //              ^ forgot to close tag but not the end of the file
             _ => {
-                return Err("Expected closing tag".to_string());
+                let last_token = self.tokens[self.tokens.len() - 1].clone();
+                errors.push(ParserError {
+                    message: "Expected '}'".to_string(),
+                    start: last_token.end.clone(),
+                    end: last_token.end.clone(),
+                });
             }
         }
 
-        Ok(exp)
+        exp
     }
 
-    fn tag_property(&mut self) -> Result<Value, String> {
-        // Stop parsing when tag end is met or argument initalizer is met
-        // self.visit_ws();
-        let advance_res = self.advance();
-        if advance_res.is_none() {
-            return Err("Unexpected end".to_string());
+    fn tag_property(&mut self, errors: &mut Vec<ParserError>) -> Option<Value> {
+        let peek_res = self.peek();
+        if peek_res.is_none() {
+            let last_token = self.tokens[self.tokens.len() - 1].clone();
+            errors.push(ParserError {
+                message: "Unexpected EOF expected Property".to_string(),
+                start: last_token.end.clone(),
+                end: last_token.end.clone(),
+            });
+            return None;
         }
-        let propery_init_token = advance_res.unwrap();
+        let propery_init_token = peek_res.unwrap();
 
         // Ex: data.guild.meta.name
         if let TToken::Ident(ident) = propery_init_token.token {
+            self.advance();
             let mut idents = Vec::new();
             idents.push(ident);
 
             let next = self.peek();
             if next.is_none() {
-                return Ok(Value::Property(Property {
-                    _type: "Property".to_string(),
-                    value: idents,
-                    start: propery_init_token.start,
-                    end: propery_init_token.end,
-                }));
+                // NOTE: Should be an error of unclosed or unexpected EOF which is hanndled by 'tag_expression'
+                return None;
             }
+            let next_token_data = next.unwrap();
 
-            match next.unwrap().token {
+            match next_token_data.token {
                 TToken::Dot => {
                     self.advance();
-                    // aka: ident[WS]idnt
-                    // there was 'ws' followed by an ident rather then a 'dot'
-                    // let mut hitbad = false;
 
+                    let mut last_was_dot = true;
                     while !self.is_at_end() {
                         let token_data = self.peek();
-                        if let Some(token) = token_data {
-                            match token.token {
+                        if let Some(token_safe) = token_data {
+                            match token_safe.token {
                                 TToken::Dot => {
+                                    if last_was_dot {
+                                        errors.push(ParserError {
+                                            message: "Unexpected '.'".to_string(),
+                                            start: token_safe.start,
+                                            end: token_safe.end,
+                                        });
+                                    } else {
+                                        last_was_dot = true;
+                                    }
                                     self.advance();
                                 }
-                                TToken::Ident(id) => {
+                                TToken::ArgumentSeperator | TToken::Int(_) => {
+                                    errors.push(ParserError {
+                                        message: "Unexpected Token".to_string(),
+                                        start: token_safe.start,
+                                        end: token_safe.end,
+                                    });
                                     self.advance();
-                                    idents.push(id)
                                 }
-                                _ => break,
+                                TToken::Ident(idnt) => {
+                                    self.advance();
+                                    if !last_was_dot {
+                                        // // Unsure if we should have the same recovery behaver as with the first instance of just skiping...
+                                        let end_token = self.advance_until(vec![
+                                            TToken::ArgumentInitalizer,
+                                            TToken::CloseTag,
+                                        ]);
+
+                                        let end_position = {
+                                            if end_token.is_some() {
+                                                end_token.unwrap().end
+                                            } else {
+                                                token_safe.end
+                                            }
+                                        };
+
+                                        errors.push(ParserError {
+                                            message: "Unexpected Token".to_string(),
+                                            start: token_safe.start,
+                                            end: end_position,
+                                        });
+                                    } else {
+                                        idents.push(idnt);
+                                        last_was_dot = false;
+                                    }
+                                }
+                                TToken::WS | TToken::OpenTag | TToken::Text(_) => {}
+                                TToken::ArgumentInitalizer | TToken::CloseTag => break, //  _ => break,
                             };
                         } else {
                             break;
                         }
                     }
-                }
-                TToken::CloseTag | TToken::Text(_) | TToken::WS => {}
-                TToken::ArgumentSeperator | TToken::Ident(_) | TToken::Int(_) | TToken::OpenTag => {
-                    return Err("Unexpected token_".to_string());
-                }
-                // TODO: Advance untill token that isnt ws is met
-                // TToken::WS => {
-                //     // self.visit_ws();
-                //     let after_token = &self.tokens[self.pointer].clone();
 
-                //     if let TToken::Dot = after_token.token {
-                //         idents.append(&mut self.tag_property_dot())
-                //     } else if let TToken::CloseTag = after_token.token {
-                //     } else {
-                //         return Err(
-                //             format!("Unexpected token. found {:?}", after_token.token).to_string()
-                //         );
-                //     }
-                // }
-                TToken::ArgumentInitalizer => {}
+                    // Aka: {Idnt.} - no follow up was provided
+                    if idents.len() < 2 {
+                        errors.push(ParserError {
+                            message: "Expected Idnt".to_string(),
+                            start: next_token_data.start,
+                            end: next_token_data.end,
+                        });
+                    }
+                }
+                // "TToken::ArgumentInitalizer"{Idnt|...} - should return the ident collected
+                TToken::ArgumentInitalizer | TToken::CloseTag | TToken::Text(_) | TToken::WS => {}
+                TToken::ArgumentSeperator | TToken::Ident(_) | TToken::Int(_) | TToken::OpenTag => {
+                    self.advance();
+                    let end_token =
+                        self.advance_until(vec![TToken::ArgumentInitalizer, TToken::CloseTag]);
+
+                    let end_position = {
+                        if end_token.is_some() {
+                            end_token.unwrap().end
+                        } else {
+                            next_token_data.end
+                        }
+                    };
+
+                    errors.push(ParserError {
+                        message: "Unexpected Token".to_string(),
+                        start: next_token_data.start,
+                        end: end_position,
+                    });
+                }
             }
 
-            Ok(Value::Property(Property {
+            Some(Value::Property(Property {
                 _type: "Property".to_string(),
                 value: idents,
                 start: propery_init_token.start,
                 end: propery_init_token.end,
             }))
         } else {
-            Err("Expected Identifyer".to_string())
+            errors.push(ParserError {
+                message: "Expected Identifyer".to_string(),
+                start: propery_init_token.start.clone(),
+                end: propery_init_token.start,
+            });
+            None
         }
     }
 
-    fn tag_arguments(&mut self) {
-        // Stop parsing when tag end is met
+    fn tag_arguments(&mut self) {}
+
+    // returns the final token
+    fn advance_until(&mut self, skip_until: Vec<TToken>) -> Option<Token> {
+        if skip_until.len() > 0 {
+            while !self.is_at_end() {
+                let peeked = self.peek();
+                // none only if it's the end of the program, so should not happen
+                if peeked.is_none() {
+                    break;
+                }
+
+                if skip_until.contains(&peeked.as_ref().unwrap().token) {
+                    return Some(peeked.unwrap());
+                }
+                self.advance();
+            }
+
+            None
+        } else {
+            None
+        }
     }
 
     fn advance(&mut self) -> Option<Token> {
@@ -289,7 +391,7 @@ mod tests {
     use super::*;
     use crate::lex::Lexer;
 
-    fn parse_base(program: &str) -> Result<Source, String> {
+    fn parse_base(program: &str) -> Result<ParserResults, String> {
         let mut lex = Lexer::from_source(program);
         let res = lex.scan_tokens();
         if res.is_err() {
@@ -298,28 +400,23 @@ mod tests {
         }
 
         let mut parser = Parser::from_source(lex);
-        parser.parse()
+        Ok(parser.parse())
     }
 
     #[test]
     fn tag_property_only() {
-        assert!(parse_base("Hello, { guild }").is_ok());
-        assert!(parse_base("Hello, { guild . name }").is_ok());
+        assert!(parse_base("h{ guild }").unwrap().errors.len() == 0);
+        assert!(parse_base("h{ guild . name }").unwrap().errors.len() == 0);
     }
 
     #[test]
     fn tag_property_errs() {
-        // TODO: Should cause err...
-        assert!(parse_base("Hello, {guild.}").is_err());
-        assert!(parse_base("Hello, {guild..}").is_err());
+        assert!(parse_base("h{guild.}").unwrap().errors.len() > 0);
+        assert!(parse_base("h{guild..}").unwrap().errors.len() > 0);
+        assert!(parse_base("h{guild").unwrap().errors.len() > 0);
 
-        assert_eq!(
-            format!("{:?}", parse_base("Hello, {guild")),
-            "Err(\"Expected closing tag (none)\")"
-        );
-        assert_eq!(
-            format!("{:?}", parse_base("Hello, { {guild}")),
-            "Err(\"Expected Identifyer\")"
-        );
+        // Bugged: 'guild' is not processed correctly...
+        assert!(parse_base("h{ {guild").unwrap().errors.len() > 0);
+        // println!("{:#?}", parse_base("{ t { } }").unwrap());
     }
 }

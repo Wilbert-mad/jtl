@@ -1,6 +1,6 @@
 use super::utils;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TToken {
     WS,
     Text(String),
