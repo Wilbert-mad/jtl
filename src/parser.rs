@@ -201,11 +201,11 @@ impl Parser {
             });
             return None;
         }
+        self.advance();
         let propery_init_token = peek_res.unwrap();
 
         // Ex: data.guild.meta.name
         if let TToken::Ident(ident) = propery_init_token.token {
-            self.advance();
             let mut idents = Vec::new();
             idents.push(ident);
 
@@ -415,8 +415,8 @@ mod tests {
         assert!(parse_base("h{guild..}").unwrap().errors.len() > 0);
         assert!(parse_base("h{guild").unwrap().errors.len() > 0);
 
-        // Bugged: 'guild' is not processed correctly...
         assert!(parse_base("h{ {guild").unwrap().errors.len() > 0);
+        // println!("{:#?}", parse_base("h{ {guild").unwrap());
         // println!("{:#?}", parse_base("{ t { } }").unwrap());
     }
 }
