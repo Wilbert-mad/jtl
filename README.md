@@ -24,19 +24,28 @@ Unlike many other templating langauges this one offers an LSP for your dashboard
 
 ```json
 {
+  "__version": "1.0.0",
   "functions": {
     "ToPlacement": {
+      ":description": ["Converts number into placement"],
       "arguments": ["Int"],
       "return": "String"
     }
   },
   "structures": {
-    "User": { "mention": "String" },
-    "Guild": { "count": "Int" }
+    "User": {
+      ":description": [],
+      "mention": ["String", ["String mention of the member"]]
+    },
+    "Guild": {
+      ":description": [],
+      "count": ["Int", ["The number of member in the guild"]],
+      "name": ["String", null]
+    }
   },
   "global": {
-    "user": "$User",
-    "guild": "$Guild",
+    "user": "#User",
+    "guild": "#Guild",
     "toPlacement": "@ToPlacement"
   }
 }
