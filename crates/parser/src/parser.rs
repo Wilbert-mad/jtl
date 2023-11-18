@@ -28,7 +28,7 @@ pub enum Stat {
 pub struct Expression {
     pub _type: String,
     pub property: Option<Value>,
-    pub arguments: Option<Vec<Argument>>,
+    pub arguments: Option<Vec<Arg>>,
 }
 
 #[derive(Debug)]
@@ -38,7 +38,8 @@ pub enum Value {
         _type: String,
         start: Position,
         end: Position,
-        value: usize,
+        // Lexer; Int(u32)
+        value: u32,
     },
     // Bool {
     //     _type: String,
@@ -60,8 +61,20 @@ pub struct Property {
 }
 
 #[derive(Debug)]
+pub enum Arg {
+    Single(Argument),
+    //// Valid -> { toPlacement | (toInt | guild.count ; 0) ; false }
+    // Group(Expression),
+}
+
+// Invalid -> { toPlacement | (toInt | guild.count ; 0) ; false }
+// Valid -> { toPlacement | 0 ; false }
+#[derive(Debug)]
 pub struct Argument {
     pub _type: String,
+    pub value: Value,
+    pub start: Position,
+    pub end: Position,
 }
 
 #[derive(Debug)]
@@ -77,7 +90,6 @@ pub struct ParserResults {
     pub ast: Source,
 }
 
-// TODO: Make parser fault tolorent (some day)
 pub struct Parser {
     // errors: vec![],
     tokens: Vec<Token>,
@@ -152,13 +164,12 @@ impl Parser {
     fn tag_expression(&mut self, mut errors: &mut Vec<ParserError>) -> Expression {
         let property = self.tag_property(&mut errors);
 
-        // TODO: check arguments...
-        let _arguments = self.tag_arguments();
+        let arguments = self.tag_arguments(&mut errors);
 
         let exp = Expression {
             _type: "Expression".to_string(),
             property,
-            arguments: None,
+            arguments,
         };
 
         // Hello {guild
@@ -316,6 +327,8 @@ impl Parser {
                 _type: "Property".to_string(),
                 value: idents,
                 start: propery_init_token.start,
+                // TODO: Fix, Tecnically not right, the is the end of the first identifyer
+                // but fillowing identifyers are not taken into account
                 end: propery_init_token.end,
             }))
         } else {
@@ -328,7 +341,182 @@ impl Parser {
         }
     }
 
-    fn tag_arguments(&mut self) {}
+    fn tag_arguments(&mut self, mut errors: &mut Vec<ParserError>) -> Option<Vec<Arg>> {
+        let peek_res = self.peek();
+        if peek_res.is_none() {
+            let last_token = self.tokens[self.tokens.len() - 1].clone();
+            errors.push(ParserError {
+                message: "Unexpected EOF".to_string(),
+                start: last_token.start,
+                end: last_token.end,
+            });
+            return None;
+        }
+        let argument_init_token = peek_res.unwrap();
+
+        if argument_init_token.token == TToken::ArgumentInitalizer {
+            self.advance();
+            let mut arguments: Vec<Arg> = Vec::new();
+
+            let mut expect_seperator = false;
+            while !self.is_at_end() {
+                let next_token_data = self.peek();
+                if next_token_data.is_none() {
+                    let last_token = self.tokens[self.tokens.len() - 1].clone();
+                    errors.push(ParserError {
+                        message: "Unexpected EOF expected Arg".to_string(),
+                        start: last_token.start,
+                        end: last_token.end,
+                    });
+                    return None;
+                }
+
+                let next_token = next_token_data.unwrap();
+                match next_token.token {
+                    TToken::Int(int) => {
+                        self.advance();
+                        if expect_seperator {
+                            errors.push(ParserError {
+                                message: "Expected ';'".to_string(),
+                                start: next_token.start.clone(),
+                                end: next_token.start.clone(),
+                            })
+                        }
+                        arguments.push(Arg::Single(Argument {
+                            _type: "ArgSingle".to_string(),
+                            value: Value::Int {
+                                _type: "Int".to_string(),
+                                start: next_token.start.clone(),
+                                end: next_token.end.clone(),
+                                value: int,
+                            },
+                            start: next_token.start,
+                            end: next_token.end,
+                        }));
+                        expect_seperator = true;
+                    }
+                    TToken::Ident(ident) => {
+                        self.advance();
+                        if expect_seperator {
+                            errors.push(ParserError {
+                                message: "Expected ';'".to_string(),
+                                start: next_token.start.clone(),
+                                end: next_token.start.clone(),
+                            })
+                        }
+                        let idents_property = self.tag_arg_construct_ident(
+                            next_token.start.clone(),
+                            next_token.end.clone(),
+                            ident,
+                            &mut errors,
+                        );
+
+                        arguments.push(Arg::Single(Argument {
+                            _type: "ArgSingle".to_string(),
+                            start: idents_property.start.clone(),
+                            end: idents_property.end.clone(),
+                            value: Value::Property(idents_property),
+                        }));
+                        expect_seperator = true;
+                    }
+                    TToken::ArgumentSeperator => {
+                        self.advance();
+                        expect_seperator = false;
+                    }
+                    TToken::ArgumentInitalizer | TToken::Dot => {
+                        self.advance();
+                        errors.push(ParserError {
+                            message: "Unexpected Token".to_string(),
+                            start: next_token.start,
+                            end: next_token.end,
+                        });
+                    }
+                    TToken::Text(_) | TToken::WS | TToken::OpenTag => {}
+                    TToken::CloseTag => break,
+                }
+            }
+
+            if arguments.len() > 0 {
+                Some(arguments)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    // {toPlacement|data.guild.meta.name;}
+    //             {^^^^^^^^^^^^^^^^^^^^}
+    // NOTE: Similar to 'tag_property' idents parsing but not the same
+    fn tag_arg_construct_ident(
+        &mut self,
+        token_start: Position,
+        token_end: Position,
+        inital: String,
+        errors: &mut Vec<ParserError>,
+    ) -> Property {
+        let mut idents: Vec<String> = Vec::new();
+        idents.push(inital);
+
+        let mut last_was_dot = false;
+        while !self.is_at_end() {
+            let token_data = self.peek();
+            if let Some(token_safe) = token_data {
+                match token_safe.token {
+                    TToken::Dot => {
+                        if last_was_dot {
+                            errors.push(ParserError {
+                                message: "Unexpected '.'".to_string(),
+                                start: token_safe.start,
+                                end: token_safe.end,
+                            });
+                        } else {
+                            last_was_dot = true
+                        }
+                        self.advance();
+                    }
+                    TToken::Ident(ident) => {
+                        self.advance();
+                        if !last_was_dot {
+                            let end_token = self
+                                .advance_until(vec![TToken::ArgumentSeperator, TToken::CloseTag]);
+
+                            let end_position = {
+                                if end_token.is_some() {
+                                    end_token.unwrap().end
+                                } else {
+                                    token_safe.end
+                                }
+                            };
+
+                            errors.push(ParserError {
+                                message: "Unexpected Token".to_string(),
+                                start: token_safe.start,
+                                end: end_position,
+                            });
+                        } else {
+                            idents.push(ident);
+                            last_was_dot = false;
+                        }
+                    }
+                    TToken::ArgumentInitalizer | TToken::Int(_) => {}
+                    TToken::Text(_) | TToken::WS | TToken::OpenTag => {}
+                    TToken::CloseTag => break,
+                    TToken::ArgumentSeperator => break,
+                };
+            } else {
+                break;
+            }
+        }
+
+        Property {
+            _type: "Property".to_string(),
+            value: idents,
+            start: token_start,
+            end: token_end,
+        }
+    }
 
     // returns the final token
     fn advance_until(&mut self, skip_until: Vec<TToken>) -> Option<Token> {
@@ -416,7 +604,17 @@ mod tests {
         assert!(parse_base("h{guild").unwrap().errors.len() > 0);
 
         assert!(parse_base("h{ {guild").unwrap().errors.len() > 0);
+        // NOTE: Not parsed as would like but good enough.
+        // after the tag parse of 'tag_property' ends and ['expected identifyer', 'expected "}"'] are errors returned
+        // *this is not a bug, but a feature :>jk
+        //// -> println!("{:#?}", parse_base("h{.guild}").unwrap());
+
         // println!("{:#?}", parse_base("h{ {guild").unwrap());
         // println!("{:#?}", parse_base("{ t { } }").unwrap());
+    }
+
+    #[test]
+    fn tag_arguments_single() {
+        println!("{:#?}", parse_base("{t|guild}").unwrap())
     }
 }

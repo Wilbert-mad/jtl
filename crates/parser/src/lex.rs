@@ -63,6 +63,7 @@ impl Lexer {
         }
     }
 
+    // TODO: Show position when erroring
     pub fn scan_tokens(&mut self) -> Result<(), String> {
         while !self.is_at_end() {
             let char = self.advance();
