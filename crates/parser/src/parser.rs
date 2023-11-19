@@ -27,13 +27,19 @@ pub enum Stat {
 #[derive(Debug)]
 pub struct Expression {
     pub _type: String,
-    pub property: Option<Value>,
+    pub property: Option<PValue>,
     pub arguments: Option<Vec<Arg>>,
 }
 
 #[derive(Debug)]
-pub enum Value {
+pub enum PValue {
     Property(Property),
+    String {
+        _type: String,
+        start: Position,
+        end: Position,
+        value: String,
+    },
     Int {
         _type: String,
         start: Position,
@@ -72,7 +78,7 @@ pub enum Arg {
 #[derive(Debug)]
 pub struct Argument {
     pub _type: String,
-    pub value: Value,
+    pub value: PValue,
     pub start: Position,
     pub end: Position,
 }
@@ -98,7 +104,7 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn from_source(lex: Lexer) -> Self {
+    pub fn from_lexer(lex: Lexer) -> Self {
         Parser {
             pointer: 0,
             tokens: lex.tokens,
@@ -201,7 +207,7 @@ impl Parser {
         exp
     }
 
-    fn tag_property(&mut self, errors: &mut Vec<ParserError>) -> Option<Value> {
+    fn tag_property(&mut self, errors: &mut Vec<ParserError>) -> Option<PValue> {
         let peek_res = self.peek();
         if peek_res.is_none() {
             let last_token = self.tokens[self.tokens.len() - 1].clone();
@@ -283,6 +289,15 @@ impl Parser {
                                         last_was_dot = false;
                                     }
                                 }
+                                // {idnt.something ""} -> not allowed
+                                TToken::String(_) => {
+                                    self.advance();
+                                    errors.push(ParserError {
+                                        message: "Unexpected String".to_string(),
+                                        start: token_safe.start,
+                                        end: token_safe.end,
+                                    })
+                                }
                                 TToken::WS | TToken::OpenTag | TToken::Text(_) => {}
                                 TToken::ArgumentInitalizer | TToken::CloseTag => break, //  _ => break,
                             };
@@ -302,7 +317,11 @@ impl Parser {
                 }
                 // "TToken::ArgumentInitalizer"{Idnt|...} - should return the ident collected
                 TToken::ArgumentInitalizer | TToken::CloseTag | TToken::Text(_) | TToken::WS => {}
-                TToken::ArgumentSeperator | TToken::Ident(_) | TToken::Int(_) | TToken::OpenTag => {
+                TToken::ArgumentSeperator
+                | TToken::String(_)
+                | TToken::Ident(_)
+                | TToken::Int(_)
+                | TToken::OpenTag => {
                     self.advance();
                     let end_token =
                         self.advance_until(vec![TToken::ArgumentInitalizer, TToken::CloseTag]);
@@ -323,7 +342,7 @@ impl Parser {
                 }
             }
 
-            Some(Value::Property(Property {
+            Some(PValue::Property(Property {
                 _type: "Property".to_string(),
                 value: idents,
                 start: propery_init_token.start,
@@ -373,6 +392,28 @@ impl Parser {
 
                 let next_token = next_token_data.unwrap();
                 match next_token.token {
+                    TToken::String(text) => {
+                        self.advance();
+                        if expect_seperator {
+                            errors.push(ParserError {
+                                message: "Expected ';'".to_string(),
+                                start: next_token.start.clone(),
+                                end: next_token.start.clone(),
+                            })
+                        }
+                        arguments.push(Arg::Single(Argument {
+                            _type: "ArgSingle".to_string(),
+                            value: PValue::String {
+                                _type: "String".to_string(),
+                                start: next_token.start.clone(),
+                                end: next_token.end.clone(),
+                                value: text,
+                            },
+                            start: next_token.start.clone(),
+                            end: next_token.end.clone(),
+                        }));
+                        expect_seperator = true;
+                    }
                     TToken::Int(int) => {
                         self.advance();
                         if expect_seperator {
@@ -384,7 +425,7 @@ impl Parser {
                         }
                         arguments.push(Arg::Single(Argument {
                             _type: "ArgSingle".to_string(),
-                            value: Value::Int {
+                            value: PValue::Int {
                                 _type: "Int".to_string(),
                                 start: next_token.start.clone(),
                                 end: next_token.end.clone(),
@@ -415,7 +456,7 @@ impl Parser {
                             _type: "ArgSingle".to_string(),
                             start: idents_property.start.clone(),
                             end: idents_property.end.clone(),
-                            value: Value::Property(idents_property),
+                            value: PValue::Property(idents_property),
                         }));
                         expect_seperator = true;
                     }
@@ -500,6 +541,14 @@ impl Parser {
                             last_was_dot = false;
                         }
                     }
+                    TToken::String(_) => {
+                        self.advance();
+                        errors.push(ParserError {
+                            message: "Unexpected Token".to_string(),
+                            start: token_safe.start,
+                            end: token_safe.end,
+                        })
+                    }
                     TToken::ArgumentInitalizer | TToken::Int(_) => {}
                     TToken::Text(_) | TToken::WS | TToken::OpenTag => {}
                     TToken::CloseTag => break,
@@ -551,6 +600,9 @@ impl Parser {
             None
         } else {
             self.visit_ws();
+            if self.is_at_end() {
+                return None;
+            }
             Some(self.tokens[self.pointer].clone())
         }
     }
@@ -587,7 +639,7 @@ mod tests {
             return Err(res.err().unwrap());
         }
 
-        let mut parser = Parser::from_source(lex);
+        let mut parser = Parser::from_lexer(lex);
         Ok(parser.parse())
     }
 
@@ -615,6 +667,7 @@ mod tests {
 
     #[test]
     fn tag_arguments_single() {
-        println!("{:#?}", parse_base("{t|guild}").unwrap())
+        // println!("{:#?}", parse_base("{t|guild}").unwrap());
+        println!("{:#?}", parse_base("test \n {g}").unwrap());
     }
 }

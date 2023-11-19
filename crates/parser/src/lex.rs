@@ -10,7 +10,7 @@ pub enum TToken {
     // 999999999 - u32 max
     Int(u32),
     // Bool(bool),
-    // String(String),
+    String(String),
     Dot,
     ArgumentInitalizer,
     ArgumentSeperator,
@@ -104,6 +104,25 @@ impl Lexer {
                             self.position.advance_line();
                             Some(TToken::ArgumentInitalizer)
                         }
+                        // TODO: escapeable string
+                        (false, '"') => {
+                            self.position.advance_line();
+                            let start = self.pointer.clone() - 1;
+                            loop {
+                                self.position.advance_line();
+                                match self.advance() {
+                                    Some('"') => break,
+                                    Some(_) => {}
+                                    None => return Err("Unterminated string".to_string()),
+                                }
+                            }
+                            Some(TToken::String(
+                                // Remove starting '"' and end '"'
+                                self.source_chars[(start + 1)..(self.pointer - 1)]
+                                    .into_iter()
+                                    .collect(),
+                            ))
+                        }
 
                         (true, text) => {
                             let mut content = String::new();
@@ -111,8 +130,12 @@ impl Lexer {
 
                             let mut chr: Option<char> = Some(text);
                             while chr.is_some() {
-                                content += &chr.unwrap().to_string();
+                                let x = chr.unwrap().to_string();
+                                content += &x;
                                 if self.peek() == Some('{') {
+                                    break;
+                                }
+                                if self.peek() == Some('\n') {
                                     break;
                                 }
                                 chr = self.advance();
@@ -218,7 +241,8 @@ mod tests {
 
     #[test]
     fn basic_lex() {
-        let mut lex = Lexer::from_source("Hello, {ToPlacement|guild.count}");
+        let mut lex = Lexer::from_source("\n\n");
+        // let mut lex = Lexer::from_source("Hello, {ToPlacement|guild.count}");
 
         let res = lex.scan_tokens();
         // .expect("Scanner should not fail to parse source");

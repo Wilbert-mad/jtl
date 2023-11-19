@@ -54,3 +54,17 @@ Unlike many other templating langauges this one offers an LSP for your dashboard
 <small>In reference to the template provided initially</small>
 
 # TODO (WIP)
+
+[ ] Fix major bug with resulting whitespace after tag and line breaks
+
+- Note: the position is consistent, however position calculation are not done to regain whitespace/line breaks.
+
+- ```rust
+  let input = "Hay, {user.mention} \n welcome to {guild.name}";
+  let expected = "Hay, <@xxx> \n welcome to BarFight";
+  let input_return = "Hay, <@xxx>welcome to BarFight";
+
+  let input = "Hay, {user.mention} welcome to {guild.name}";
+  let expected = "Hay, <@xxx> welcome to BarFight";
+  let input_return = "Hay, <@xxx>welcome to BarFight";
+  ```
