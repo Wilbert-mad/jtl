@@ -1,0 +1,15 @@
+[package]
+name = "jtl_wasm_service"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+lsp-types = "0.94.1"
+jtl_service = { path = "../service" }
+wasm-bindgen = { version = "0.2.82" }
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.5.0"

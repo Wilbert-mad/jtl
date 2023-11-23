@@ -25,6 +25,7 @@ pub struct Token {
 }
 
 /// Position(column, line)
+// #[deprecated]
 #[derive(Debug, Clone)]
 pub struct Position(pub usize, pub usize);
 impl Position {
@@ -38,9 +39,9 @@ impl Position {
     fn back_line(&mut self) {
         self.1 -= 1
     }
-    // pub fn to_pointer(&self) -> usize {
-    //     self.1 + self.0
-    // }
+    pub fn to_pointer(&self) -> usize {
+        self.1 + self.0
+    }
 }
 
 #[derive(Debug)]

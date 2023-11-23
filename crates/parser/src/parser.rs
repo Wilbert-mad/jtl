@@ -27,6 +27,8 @@ pub enum Stat {
 #[derive(Debug)]
 pub struct Expression {
     pub _type: String,
+    pub start: Position,
+    pub end: Position,
     pub property: Option<PValue>,
     pub arguments: Option<Vec<Arg>>,
 }
@@ -143,11 +145,12 @@ impl Parser {
 
                     TToken::OpenTag => {
                         let tag = self.tag_expression(&mut errors);
+                        let closing_token = self.tokens[self.pointer - 1].clone();
 
                         body.push(Stat::Tag {
                             _type: "Tag".to_string(),
                             start: token_data.start,
-                            end: token_data.end, // TODO: fix not the real end
+                            end: closing_token.start,
                             value: tag,
                         })
                     }
@@ -168,12 +171,16 @@ impl Parser {
     }
 
     fn tag_expression(&mut self, mut errors: &mut Vec<ParserError>) -> Expression {
+        let start = self.tokens[self.pointer - 1].clone();
         let property = self.tag_property(&mut errors);
 
         let arguments = self.tag_arguments(&mut errors);
+        let last_token = self.tokens[self.pointer - 1].clone();
 
         let exp = Expression {
             _type: "Expression".to_string(),
+            start: start.end,
+            end: last_token.end,
             property,
             arguments,
         };
@@ -195,7 +202,7 @@ impl Parser {
             // {toString | 0 world
             //              ^ forgot to close tag but not the end of the file
             _ => {
-                let last_token = self.tokens[self.tokens.len() - 1].clone();
+                let last_token = self.tokens[self.tokens.len() - 1].clone(); // May be a bug idk. need testing later
                 errors.push(ParserError {
                     message: "Expected '}'".to_string(),
                     start: last_token.end.clone(),
@@ -342,13 +349,24 @@ impl Parser {
                 }
             }
 
+            let property_last_token = self.tokens[self.pointer - 1].clone();
+
+            // When the last token is a closing it should be the token's 'start-1' otherwise it should be 'end'
+            let end = {
+                match property_last_token.token {
+                    TToken::CloseTag => {
+                        let st = property_last_token.start;
+                        Position(st.0, st.1 - 1)
+                    }
+                    _ => property_last_token.end,
+                }
+            };
+
             Some(PValue::Property(Property {
                 _type: "Property".to_string(),
                 value: idents,
                 start: propery_init_token.start,
-                // TODO: Fix, Tecnically not right, the is the end of the first identifyer
-                // but fillowing identifyers are not taken into account
-                end: propery_init_token.end,
+                end,
             }))
         } else {
             errors.push(ParserError {
@@ -549,7 +567,9 @@ impl Parser {
                             end: token_safe.end,
                         })
                     }
-                    TToken::ArgumentInitalizer | TToken::Int(_) => {}
+                    TToken::ArgumentInitalizer | TToken::Int(_) => {
+                        self.advance();
+                    }
                     TToken::Text(_) | TToken::WS | TToken::OpenTag => {}
                     TToken::CloseTag => break,
                     TToken::ArgumentSeperator => break,
@@ -668,6 +688,6 @@ mod tests {
     #[test]
     fn tag_arguments_single() {
         // println!("{:#?}", parse_base("{t|guild}").unwrap());
-        println!("{:#?}", parse_base("test \n {g}").unwrap());
+        println!("{:#?}", parse_base("test \n {g | t |}").unwrap());
     }
 }

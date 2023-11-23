@@ -1,2 +1,9 @@
-/target
-Cargo.lock
+# Rust
+target/
+
+# Editor
+/editor_example
+.parcel-cache/
+node_modules/
+dist/
+package-lock.json

@@ -1,5 +1,7 @@
 # Just another templating langauge (JTL)
 
+> ⚠️WARNING⚠️ project actice development
+
 ```
 Welcome {user.mention}, you're the {toPlacement | guild.count} to join!
 ```
@@ -13,10 +15,10 @@ Unlike many other templating langauges this one offers an LSP for your dashboard
 | ------------ | ----------------------------------------------- | -------- |
 | parser       | The core of the langauge                        | WIP 1    |
 | runtime      | Processes the execution of a template           | WIP 2    |
-| service      | Basic function for lsp                          | TODO 3   |
+| service      | Basic function for lsp                          | WIP 3    |
 | lsp          | An orginized and operational lsp (server ready) | TODO? 5  |
-| wasm_lsp     | An orginized and operational lsp (worker ready) | TODO 6   |
-| wasm_service | Simple wasm of service                          | TODO 4   |
+| wasm_lsp     | An orginized and operational lsp (worker ready) | TODO? 6  |
+| wasm_service | Simple wasm of service                          | WIP 4    |
 
 <small>Numbers repersent the order in which I will be working though the project (help is appreciated)</small>
 
@@ -35,11 +37,11 @@ Unlike many other templating langauges this one offers an LSP for your dashboard
   "structures": {
     "User": {
       ":description": [],
-      "mention": ["String", ["String mention of the member"]]
+      "mention": ["String", "String mention of the member"]
     },
     "Guild": {
       ":description": [],
-      "count": ["Int", ["The number of member in the guild"]],
+      "count": ["Int", "The number of member in the guild"],
       "name": ["String", null]
     }
   },
@@ -55,16 +57,25 @@ Unlike many other templating langauges this one offers an LSP for your dashboard
 
 # TODO (WIP)
 
-[ ] Fix major bug with resulting whitespace after tag and line breaks
+- [ ] Bench test runtime, and parser, (maybe service...)
+- [ ] Though out the code base update `Position` struct and rename `PPosition` as to not mix up with `Position` from 'lsp_types'
+  - ```rust
+    pub struct Position(pub usize, pub usize); // from
+    pub struct Position { // to
+      pub line: usize,
+      pub character: usize
+    };
+    ```
+- [ ] Fix major bug with resulting whitespace after tag and line breaks
 
-- Note: the position is consistent, however position calculation are not done to regain whitespace/line breaks.
+  - Note: the position is consistent, however position calculation are not done to regain whitespace/line breaks.
 
-- ```rust
-  let input = "Hay, {user.mention} \n welcome to {guild.name}";
-  let expected = "Hay, <@xxx> \n welcome to BarFight";
-  let input_return = "Hay, <@xxx>welcome to BarFight";
+  - ```rust
+    let input = "Hay, {user.mention} \n welcome to {guild.name}";
+    let expected = "Hay, <@xxx> \n welcome to BarFight";
+    let input_return = "Hay, <@xxx>welcome to BarFight";
 
-  let input = "Hay, {user.mention} welcome to {guild.name}";
-  let expected = "Hay, <@xxx> welcome to BarFight";
-  let input_return = "Hay, <@xxx>welcome to BarFight";
-  ```
+    let input = "Hay, {user.mention} welcome to {guild.name}";
+    let expected = "Hay, <@xxx> welcome to BarFight";
+    let input_return = "Hay, <@xxx>welcome to BarFight";
+    ```
