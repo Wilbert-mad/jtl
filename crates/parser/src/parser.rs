@@ -145,12 +145,19 @@ impl Parser {
 
                     TToken::OpenTag => {
                         let tag = self.tag_expression(&mut errors);
-                        let closing_token = self.tokens[self.pointer - 1].clone();
+                        let closing_token_end = {
+                            if !self.is_at_end() {
+                                self.tokens[self.pointer - 1].end.clone()
+                            } else {
+                                // AKA last token, I think...
+                                self.tokens[self.tokens.len() - 1].end.clone()
+                            }
+                        };
 
                         body.push(Stat::Tag {
                             _type: "Tag".to_string(),
                             start: token_data.start,
-                            end: closing_token.start,
+                            end: closing_token_end,
                             value: tag,
                         })
                     }
