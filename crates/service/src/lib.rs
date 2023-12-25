@@ -178,16 +178,16 @@ impl Service {
         let ast_source = ast.unwrap();
         let node_res = get_node_at_offset(&mut document, offset, &ast_source);
 
-        println!("{:?}", node_res);
-        println!("{:?}", offset);
-        println!("{:#?}", ast_source.body);
+        // println!("{:?}", node_res);
+        // println!("{:?}", offset);
+        // println!("{:#?}", ast_source.body);
         if node_res.is_none() {
             return CompletionList {
                 is_incomplete: false,
                 items: vec![],
             };
         }
-        let node: parser_get_node_at::Node<'_> = node_res.unwrap();
+        let node: parser_get_node_at::Node = node_res.unwrap();
 
         match node {
             Node::Expression => {

@@ -58,13 +58,6 @@ pub fn service_do_autocomplete(
     position: Box<[u32]>,
     schema_service: &WASMLspSchema,
 ) -> Result<JsValue, Error> {
-    // let schema: Option<SchemaService> = {
-    //     if schema_service.is_some() {
-    //         Some(schema_service.unwrap().into_schema())
-    //     } else {
-    //         None
-    //     }
-    // };
     let schema = schema_service.into_schema();
 
     let completion_results = Service::do_autocomplete(

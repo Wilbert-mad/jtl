@@ -6,21 +6,17 @@ use jtl_parser::parser::{PValue, Property, Source, Stat};
 use crate::document::Document;
 
 #[derive(Debug)]
-pub enum Node<'a> {
+pub enum Node {
     /// If the node is of type text
     Text,
     /// If the node is empty('{}')
     Expression,
     /// If the node is within the property section
-    Property(&'a Property),
+    Property(Property),
     // Argumment(),
 }
 
-pub fn get_node_at_offset<'a>(
-    document: &'a mut Document,
-    offset: u32,
-    program: &'a Source,
-) -> Option<Node<'a>> {
+pub fn get_node_at_offset(document: &mut Document, offset: u32, program: &Source) -> Option<Node> {
     let child_node = child_at_offset(document, offset, &program.body);
     // println!("YYYY {:?}", &child_node);
     // println!("YYYY {:?} {:?}", offset, &program.body);
@@ -30,11 +26,7 @@ pub fn get_node_at_offset<'a>(
     None
 }
 
-fn visit_child_node<'c>(
-    document: &'c mut &Document,
-    offset: u32,
-    node: &'c Stat,
-) -> Option<Node<'c>> {
+fn visit_child_node(document: &mut Document, offset: u32, node: &Stat) -> Option<Node> {
     match node {
         Stat::Text {
             _type: _,
@@ -59,16 +51,13 @@ fn visit_child_node<'c>(
                 return None;
             }
 
-            Some(Node::Property(property))
+            let property_owned = (*property).clone();
+            Some(Node::Property(property_owned))
         }
     }
 }
 
-fn child_at_offset<'b>(
-    document: &'b mut &Document,
-    offset: u32,
-    children: &'b Vec<Stat>,
-) -> Option<&'b Stat> {
+fn child_at_offset(document: &mut Document, offset: u32, children: &Vec<Stat>) -> Option<Stat> {
     let mut max = children.len() as i32 - 1i32;
     if max == -1 {
         return None;
@@ -101,8 +90,8 @@ fn child_at_offset<'b>(
         }
     }
 
-    let child = children.get(min as usize).unwrap();
-    let (start, end) = match child {
+    let child = children[min as usize].clone();
+    let (start, end) = match child.clone() {
         Stat::Tag {
             _type,
             start,
@@ -124,8 +113,8 @@ fn child_at_offset<'b>(
     // );
     // // println!("{:?} -- {:?}", start.to_pointer(), end.to_pointer());
     // // println!("{:?}", child);
-    if offset > document.offset_at(start.clone()) && offset <= document.offset_at(end.clone()) {
-        Some(&child)
+    if offset > document.offset_at(start) && offset <= document.offset_at(end) {
+        Some(child)
     } else {
         None
     }

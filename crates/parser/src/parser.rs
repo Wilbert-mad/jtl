@@ -8,7 +8,7 @@ pub struct Source {
     pub body: Vec<Stat>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Stat {
     Text {
         _type: String,
@@ -24,7 +24,7 @@ pub enum Stat {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expression {
     pub _type: String,
     pub start: PPosition,
@@ -33,7 +33,7 @@ pub struct Expression {
     pub arguments: Option<Vec<Arg>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PValue {
     Property(Property),
     String {
@@ -57,7 +57,7 @@ pub enum PValue {
     // },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Property {
     pub _type: String,
     /// A stack of the call to property.
@@ -68,7 +68,7 @@ pub struct Property {
     pub end: PPosition,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Arg {
     Single(Argument),
     //// Valid -> { toPlacement | (toInt | guild.count ; 0) ; false }
@@ -77,7 +77,7 @@ pub enum Arg {
 
 // Invalid -> { toPlacement | (toInt | guild.count ; 0) ; false }
 // Valid -> { toPlacement | 0 ; false }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Argument {
     pub _type: String,
     pub value: PValue,
