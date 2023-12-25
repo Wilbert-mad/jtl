@@ -2,7 +2,7 @@
 // https://github.com/microsoft/vscode-languageserver-node/blob/main/textDocument/src/main.ts
 // MIT License - https://github.com/microsoft/vscode-languageserver-node/blob/main/License.txt
 
-use jtl_parser::lex::Position;
+use jtl_parser::lex::PPosition;
 use std::cmp;
 
 pub struct Document {
@@ -37,29 +37,29 @@ impl Document {
     }
     pub fn position_at(&self) {}
 
-    pub fn offset_at(&mut self, position: Position) -> u32 {
+    pub fn offset_at(&mut self, position: PPosition) -> u32 {
         let line_offsets = self.get_line_offsets();
-        if position.0 >= line_offsets.len() {
+        if position.column >= line_offsets.len() {
             return self.content.len() as u32;
-        } else if position.0 < 0 {
+        } else if position.column < 0 {
             return 0;
         }
 
-        let line_offset = line_offsets[position.0];
-        let next_line_offset = if (position.0 + 1) < line_offsets.len() {
-            line_offsets[position.0 + 1]
+        let line_offset = line_offsets[position.column];
+        let next_line_offset = if (position.column + 1) < line_offsets.len() {
+            line_offsets[position.column + 1]
         } else {
             self.content.len() as u32
         };
         cmp::max(
-            cmp::min(line_offset + (position.1 as u32), next_line_offset),
+            cmp::min(line_offset + (position.line as u32), next_line_offset),
             line_offset,
         )
     }
 }
 
-static LINE_FEED: u32 = 10;
-static CARRIAGE_RETURN: u32 = 13;
+static LINE_FEED: u32 = 10; // "\n"
+static CARRIAGE_RETURN: u32 = 13; // "\r"
 
 fn compute_line_offsets(
     text: &String,
@@ -72,26 +72,19 @@ fn compute_line_offsets(
         Vec::new()
     };
 
-    let mut chars = text.chars();
+    let chars = text.chars().collect::<Vec<_>>();
 
     let mut skip_next = false;
+    // println!("--- {:?} ---", text);
     for i in 0..text.len() {
         if skip_next {
             skip_next = false;
             continue;
         }
-        // let ch = u32::from(chars.nth(i));
-        let r = chars.nth(i);
-        let ch = if r.is_some() {
-            u32::from(r.unwrap())
-        } else {
-            0
-        };
 
+        let ch = chars[i] as u32;
         if ch == LINE_FEED || ch == CARRIAGE_RETURN {
-            if ch == CARRIAGE_RETURN
-                && (i + 1) < text.len()
-                && u32::from(chars.nth(i + 1).unwrap()) == LINE_FEED
+            if ch == CARRIAGE_RETURN && (i + 1) < text.len() && u32::from(chars[i + 1]) == LINE_FEED
             {
                 skip_next = true;
             }

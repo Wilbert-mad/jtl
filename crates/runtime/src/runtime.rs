@@ -181,8 +181,8 @@ impl Runtime {
                 source,
                 format!(
                     "{}{} {}",
-                    left_pad(error.start.1, None),
-                    left_pad(error.end.1 - error.start.1, Some("^")),
+                    left_pad(error.start.line, None),
+                    left_pad(error.end.line - error.start.line, Some("^")),
                     error.message
                 ),
             )

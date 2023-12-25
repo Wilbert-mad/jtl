@@ -20,27 +20,50 @@ pub enum TToken {
 #[derive(Debug, Clone)]
 pub struct Token {
     pub token: TToken,
-    pub start: Position,
-    pub end: Position,
+    pub start: PPosition,
+    pub end: PPosition,
 }
 
 /// Position(column, line)
 // #[deprecated]
+// #[derive(Debug, Clone)]
+// pub struct Position(pub usize, pub usize);
+// impl Position {
+//     fn advance_column(&mut self) {
+//         self.1 = 0;
+//         self.0 += 1
+//     }
+//     fn advance_line(&mut self) {
+//         self.1 += 1
+//     }
+//     fn back_line(&mut self) {
+//         self.1 -= 1
+//     }
+//     pub fn to_pointer(&self) -> usize {
+//         self.1 + self.0
+//     }
+// }
+
 #[derive(Debug, Clone)]
-pub struct Position(pub usize, pub usize);
-impl Position {
+pub struct PPosition {
+    pub column: usize,
+    pub line: usize,
+}
+impl PPosition {
     fn advance_column(&mut self) {
-        self.1 = 0;
-        self.0 += 1
+        self.line = 0;
+        self.column += 1
     }
     fn advance_line(&mut self) {
-        self.1 += 1
+        self.line += 1
     }
     fn back_line(&mut self) {
-        self.1 -= 1
+        self.line -= 1
     }
+    // pub fn to_offset() -> usize {}
+    #[deprecated]
     pub fn to_pointer(&self) -> usize {
-        self.1 + self.0
+        self.line + self.column
     }
 }
 
@@ -49,7 +72,7 @@ pub struct Lexer {
     pub tokens: Vec<Token>,
     pub pointer: usize,
     source_chars: Vec<char>,
-    pub position: Position,
+    pub position: PPosition,
     pub is_text: bool,
 }
 
@@ -59,7 +82,7 @@ impl Lexer {
             tokens: Vec::new(),
             pointer: 0,
             source_chars: program.chars().collect(),
-            position: Position(0, 0),
+            position: PPosition { column: 0, line: 0 },
             is_text: true,
         }
     }
@@ -242,8 +265,12 @@ mod tests {
 
     #[test]
     fn basic_lex() {
-        let mut lex = Lexer::from_source("\n\n");
-        // let mut lex = Lexer::from_source("Hello, {ToPlacement|guild.count}");
+        // let mut lex = Lexer::from_source("\n\n");
+        let mut lex = Lexer::from_source(
+            "Hello, {
+
+ToPlacement|guild.count}",
+        );
 
         let res = lex.scan_tokens();
         // .expect("Scanner should not fail to parse source");

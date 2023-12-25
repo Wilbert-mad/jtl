@@ -25,12 +25,12 @@ pub fn diagnostic(source: String) -> Vec<Diagnostic> {
         diagnostics.push(Diagnostic {
             range: Range {
                 start: Position {
-                    character: lexr.position.1 as u32,
-                    line: lexr.position.0 as u32,
+                    character: lexr.position.line as u32,
+                    line: lexr.position.column as u32,
                 },
                 end: Position {
-                    character: (lexr.position.1 + 1) as u32,
-                    line: lexr.position.0 as u32,
+                    character: (lexr.position.line + 1) as u32,
+                    line: lexr.position.column as u32,
                 },
             },
             severity: Some(DiagnosticSeverity::ERROR),
@@ -45,12 +45,12 @@ pub fn diagnostic(source: String) -> Vec<Diagnostic> {
         diagnostics.push(Diagnostic {
             range: Range {
                 start: Position {
-                    character: err.start.1 as u32,
-                    line: err.start.0 as u32,
+                    character: err.start.line as u32,
+                    line: err.start.column as u32,
                 },
                 end: Position {
-                    character: err.end.1 as u32,
-                    line: err.end.0 as u32,
+                    character: err.end.line as u32,
+                    line: err.end.column as u32,
                 },
             },
             severity: Some(DiagnosticSeverity::ERROR),
@@ -114,12 +114,12 @@ impl Service {
             diagnostics.push(Diagnostic {
                 range: Range {
                     start: Position {
-                        character: lexr.position.1 as u32,
-                        line: lexr.position.0 as u32,
+                        character: lexr.position.line as u32,
+                        line: lexr.position.column as u32,
                     },
                     end: Position {
-                        character: (lexr.position.1 + 1) as u32,
-                        line: lexr.position.0 as u32,
+                        character: (lexr.position.line + 1) as u32,
+                        line: lexr.position.column as u32,
                     },
                 },
                 severity: Some(DiagnosticSeverity::ERROR),
@@ -135,12 +135,12 @@ impl Service {
             diagnostics.push(Diagnostic {
                 range: Range {
                     start: Position {
-                        character: err.start.1 as u32,
-                        line: err.start.0 as u32,
+                        character: err.start.line as u32,
+                        line: err.start.column as u32,
                     },
                     end: Position {
-                        character: err.end.1 as u32,
-                        line: err.end.0 as u32,
+                        character: err.end.line as u32,
+                        line: err.end.column as u32,
                     },
                 },
                 severity: Some(DiagnosticSeverity::ERROR),
@@ -170,14 +170,17 @@ impl Service {
             };
         }
 
-        let offset = document.offset_at(jtl_parser::lex::Position(
-            position.line as usize,
-            position.character as usize,
-        ));
+        let offset = document.offset_at(jtl_parser::lex::PPosition {
+            column: position.line as usize,
+            line: position.character as usize,
+        });
 
         let ast_source = ast.unwrap();
-        let node_res = get_node_at_offset(offset, &ast_source);
+        let node_res = get_node_at_offset(&mut document, offset, &ast_source);
 
+        println!("{:?}", node_res);
+        println!("{:?}", offset);
+        println!("{:#?}", ast_source.body);
         if node_res.is_none() {
             return CompletionList {
                 is_incomplete: false,
@@ -185,8 +188,6 @@ impl Service {
             };
         }
         let node: parser_get_node_at::Node<'_> = node_res.unwrap();
-
-        println!("{:?}", position);
 
         match node {
             Node::Expression => {
@@ -222,7 +223,7 @@ impl Service {
                 };
 
                 let schema_safe = schema.unwrap();
-                let content_start = position.character - (property.start.1 as u32) + 1;
+                let content_start = position.character - (property.start.line as u32) + 1;
                 let content_full = property.value.join(".");
                 // println!("content_full: {:?}", content_full);
                 // println!("content_start: {:?}", content_start);
@@ -234,7 +235,7 @@ impl Service {
                     }
                 };
 
-                println!("content_complete: {:?}", content_complete);
+                // println!("content_complete: {:?}", content_complete);
                 let char_at =
                     source.chars().collect::<Vec<_>>()[position.character as usize].to_string();
                 println!("char_at: {:?}", char_at);
@@ -250,7 +251,6 @@ impl Service {
                 for c in content_split {
                     index += 1;
                     if &index == content_split_len {
-                        println!("base_struct: {:?}", &base_struct);
                         if send_final_struct_full {
                             let mut items: Vec<CompletionItem> = Vec::new();
                             for StructuresMidd(key, _value) in base_struct.unwrap() {
@@ -267,6 +267,7 @@ impl Service {
                                 items,
                             };
                         } else {
+                            println!("base_struct: {:?}", &base_struct);
                             // TODO: Regex search
                         }
                         continue;
@@ -366,22 +367,25 @@ mod tests {
             // structures: vec![StructuresUpper("Guild".to_string(), guild_struct)],
         };
 
-        let source = "sound{guild.ne.t}".to_string();
+        let source = "start
+        {}"
+        .to_string();
+        // let source = "sound{guild.n}".to_string();
         // println!(
         //     "{:?}",
         //     Service::do_diagnostic(text_document_prop(source.clone()), Some(schema.clone()))
         // );
         println!(
-            "{:?}",
+            "{:#?}",
             Service::do_autocomplete(
                 text_document_prop(source.clone()),
                 Position {
-                    line: 0,
-                    // character: 11 // guild.
-                    // character: 13 // guild.ne|
-                    character: 15 // guild.ne|
-
-                                  // character: 8 // gui|
+                    line: 1,
+                    character: 9 // |
+                                 // character: 8 // gui|
+                                 // character: 11 // guild.|
+                                 // character: 12 // guild.n|
+                                 // character: 13 // guild.ne|
                 },
                 Some(schema)
             )

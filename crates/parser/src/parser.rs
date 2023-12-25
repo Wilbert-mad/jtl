@@ -1,10 +1,10 @@
-use crate::lex::{Lexer, Position, TToken, Token};
+use crate::lex::{Lexer, PPosition, TToken, Token};
 
 #[derive(Debug)]
 pub struct Source {
     pub _type: String,
-    pub start: Position,
-    pub end: Position,
+    pub start: PPosition,
+    pub end: PPosition,
     pub body: Vec<Stat>,
 }
 
@@ -13,13 +13,13 @@ pub enum Stat {
     Text {
         _type: String,
         value: String,
-        start: Position,
-        end: Position,
+        start: PPosition,
+        end: PPosition,
     },
     Tag {
         _type: String,
-        start: Position,
-        end: Position,
+        start: PPosition,
+        end: PPosition,
         value: Expression,
     },
 }
@@ -27,8 +27,8 @@ pub enum Stat {
 #[derive(Debug)]
 pub struct Expression {
     pub _type: String,
-    pub start: Position,
-    pub end: Position,
+    pub start: PPosition,
+    pub end: PPosition,
     pub property: Option<PValue>,
     pub arguments: Option<Vec<Arg>>,
 }
@@ -38,14 +38,14 @@ pub enum PValue {
     Property(Property),
     String {
         _type: String,
-        start: Position,
-        end: Position,
+        start: PPosition,
+        end: PPosition,
         value: String,
     },
     Int {
         _type: String,
-        start: Position,
-        end: Position,
+        start: PPosition,
+        end: PPosition,
         // Lexer; Int(u32)
         value: u32,
     },
@@ -64,8 +64,8 @@ pub struct Property {
     ///
     /// "$global.bar.foo" -> vec!["$global", "bar", "foo"]
     pub value: Vec<String>,
-    pub start: Position,
-    pub end: Position,
+    pub start: PPosition,
+    pub end: PPosition,
 }
 
 #[derive(Debug)]
@@ -81,15 +81,15 @@ pub enum Arg {
 pub struct Argument {
     pub _type: String,
     pub value: PValue,
-    pub start: Position,
-    pub end: Position,
+    pub start: PPosition,
+    pub end: PPosition,
 }
 
 #[derive(Debug)]
 pub struct ParserError {
     pub message: String,
-    pub start: Position,
-    pub end: Position,
+    pub start: PPosition,
+    pub end: PPosition,
 }
 
 #[derive(Debug)]
@@ -102,7 +102,7 @@ pub struct Parser {
     // errors: vec![],
     tokens: Vec<Token>,
     pointer: usize,
-    end_position: Position,
+    end_position: PPosition,
 }
 
 impl Parser {
@@ -122,7 +122,7 @@ impl Parser {
             errors,
             ast: Source {
                 _type: "Source".to_string(),
-                start: Position(0, 0),
+                start: PPosition { column: 0, line: 0 },
                 end: self.end_position.clone(),
                 body,
             },
@@ -363,7 +363,10 @@ impl Parser {
                 match property_last_token.token {
                     TToken::CloseTag => {
                         let st = property_last_token.start;
-                        Position(st.0, st.1 - 1)
+                        PPosition {
+                            column: st.column,
+                            line: st.line - 1,
+                        }
                     }
                     _ => property_last_token.end,
                 }
@@ -517,8 +520,8 @@ impl Parser {
     // NOTE: Similar to 'tag_property' idents parsing but not the same
     fn tag_arg_construct_ident(
         &mut self,
-        token_start: Position,
-        token_end: Position,
+        token_start: PPosition,
+        token_end: PPosition,
         inital: String,
         errors: &mut Vec<ParserError>,
     ) -> Property {
